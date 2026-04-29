@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 
 class AuthController extends Controller
 {
@@ -16,11 +18,17 @@ class AuthController extends Controller
             'nom' => 'required|string|max:255',
             'prenom' => 'required|string|max:255',
             'email' => 'required|string|email|unique:users,email',
-            'telephone' => 'required|string',
-            'password' => 'required|string|min:8|confirmed',
+            'telephone' => 'required|string|unique:users,telephone',
+            'password' => [
+                    'required',
+                    'string',
+                    'confirmed',
+                    Password::min(8)->letters()->numbers(),
+],
         ], [
             'email.unique' => 'Cet email est déjà utilisé.',
-            'required' => 'Le champ :attribute est obligatoire.'
+            'required' => 'Le champ :attribute est obligatoire.',
+            'telephone.unique' => 'Ce numéro de téléphone est déjà utilisé.',
         ]);
 
         $user = User::create([
@@ -32,24 +40,39 @@ class AuthController extends Controller
             'role' => 1,
         ]);
 
+        $token = $user->createToken('auth_token')->plainTextToken;
         return response()->json([
                 'status' => 'success',
                 'message' => 'Inscription réussie',
-                    'token' => $user->createToken('auth_token')->plainTextToken,
-                    'user' => ['nom' => $user->nom, 'prenom' => $user->prenom, 'role' => $user->role]
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => ['nom' => $user->nom, 'prenom' => $user->prenom, 'role' => $user->role]
             ], 201);
     }
 
     //connexion
     public function login(Request $request)
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'email' => 'required|email',
-            'password' => 'required',
+            'password' => [
+                'required',
+                Password::min(8)
+                    ->letters()
+                    ->numbers() 
+            ],
         ], [
             'email.required' => 'L\'email est obligatoire pour se connecter.',
             'password.required' => 'Le mot de passe est obligatoire.'
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Erreur de validation',
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
         $user = User::where('email', $request->email)->first();
 
@@ -59,10 +82,14 @@ class AuthController extends Controller
                 'message' => 'Vérifiez votre email ou votre mot de pass de connexion'], 401);
         }
 
+        $user->tokens()->delete();
+        $token = $user->createToken('auth_token')->plainTextToken;
+
         return response()->json([
             'status' =>'success',
             'message' => 'Connexion avec succès',
-            'token' => $user->createToken('auth_token')->plainTextToken,
+            'access_token' => $token,
+            'token_type' => 'Bearer',
             'user' => [
                 'nom' => $user->nom,
                 'prenom' => $user->prenom,
@@ -85,29 +112,33 @@ class AuthController extends Controller
         }
         
         if ($user->role === 1) {
-            $request->validate([
+            $validatedData = $request->validate([
                 'competences' => 'required|array',
+                'ville' => 'required|string',
                 'rayon_action' => 'required|integer',
                 'presentation' => 'required|string',
+                'experience' => 'required|integer',
             ],[
                 'competences.required' => 'Veuillez sélectionner au moins une compétence.',
+                'ville.required' => 'La ville est obligatoire.',
                 'rayon_action.required' => 'Le rayon d\'action est obligatoire.',
-                'presentation.required' => 'La présentation est nécessaire pour vos futurs clients.'
+                'presentation.required' => 'La présentation est nécessaire pour vos futurs clients.',
+                'experience.required' => 'L\'expérience est obligatoire.',
             ]);
 
-            $user->update(['role' => 2,]);
+            $user->update(array_merge($validatedData, ['role' => 2]));
 
 
                 return response()->json([
                     'status' => 'success',
                     'message' => 'Félicitations, Votre profil Artisan est désormais actif.',
-                    'role' => 2
+                    'user' => $user
                 ]);
         }
 
         return response()->json([
                 'status' => 'info',
                 'message' => 'Vous possédez déjà un profil Artisan.'
-        ], 200);
+        ], 400);
     }
 }

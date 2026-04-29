@@ -13,10 +13,14 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
         $table->json('competences')->nullable()->after('role');
+
+        $table->string('ville')->nullable()->after('competences');
         
-        $table->integer('rayon_action')->nullable()->after('competences');
+        $table->integer('rayon_action')->nullable()->after('ville');
         
         $table->text('presentation')->nullable()->after('rayon_action');
+
+        $table->integer('experience')->nullable()->after('presentation');
 
         });
     }
@@ -27,7 +31,8 @@ return new class extends Migration
     public function down(): void
     {
        Schema::table('users', function (Blueprint $table) {
-        $table->dropColumn(['competences', 'rayon_action', 'presentation']);
+        $table->dropColumn(['competences', 'ville', 'rayon_action', 'presentation', 'experience']);
+
         
         });
     }

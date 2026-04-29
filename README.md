@@ -77,3 +77,12 @@ php artisan serve
 
 -`POST /api/switchToArtisan` : Passage au rôle Artisan
 Certaines routes sont protégées par `auth:sanctum`.
+
+
+# Gestion des profils
+Lors du basculement vers le profil artisan l'utilisateur va devoir compléter les informations suivantes : 
+
+**Métiers:** Liste de compétences techniques.
+**Zone géographique:** Ville de résidence et périmètre d'intervention (en km).
+**Bio:** Présentation textuelle des services proposés.
+**Expérience:** Le nombre d'année de compétence.
